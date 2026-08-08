@@ -1,61 +1,109 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>MineFun Game Script</title>
+  <title>MineFun HTML Game</title>
   <style>
-    body { margin: 0; overflow: hidden; font-family: sans-serif; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      user-select: none;
+    }
     #instructions {
       position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      color: white;
-      text-align: center;
-      background: rgba(0, 0, 0, 0.8);
-      padding: 20px 40px;
-      border-radius: 10px;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.75);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
       cursor: pointer;
-      user-select: none;
+      z-index: 10;
     }
     #crosshair {
       position: absolute;
       top: 50%;
       left: 50%;
-      width: 8px;
-      height: 8px;
-      background: white;
-      border: 2px solid black;
-      border-radius: 50%;
+      width: 10px;
+      height: 10px;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid #000;
       transform: translate(-50%, -50%);
+      border-radius: 50%;
       pointer-events: none;
+      z-index: 5;
+    }
+    #hud {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 8px;
+      border-radius: 8px;
+      z-index: 5;
+    }
+    .slot {
+      width: 40px;
+      height: 40px;
+      border: 2px solid #ffffff;
+      border-radius: 4px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      font-weight: bold;
+    }
+    .slot.active {
+      border-color: #ffff00;
+      box-shadow: 0 0 10px #ffff00;
     }
   </style>
 </head>
 <body>
 
+  <!-- Instruction Overlay -->
   <div id="instructions">
-    <h2>اضغط هنا للبدء باللعب</h2>
-    <p>التحرك: WASD | القفز: Space</p>
-    <p>تكسير المكعب: نقرة ماوس يسار | بناء مكعب: نقرة ماوس يمين</p>
+    <h1>MineFun Game</h1>
+    <p>Click anywhere to play</p>
+    <p><strong>WASD</strong> : Move | <strong>SPACE</strong> : Jump</p>
+    <p><strong>Left Click</strong> : Break Block | <strong>Right Click</strong> : Place Block</p>
+    <p><strong>Keys 1, 2, 3</strong> : Switch Material</p>
   </div>
+
+  <!-- Crosshair -->
   <div id="crosshair"></div>
 
-  <!-- مكتبات Three.js للرسم والتحكم -->
+  <!-- Hotbar HUD -->
+  <div id="hud">
+    <div class="slot active" id="slot1" style="background:#4aa344;">1</div>
+    <div class="slot" id="slot2" style="background:#8b5a2b;">2</div>
+    <div class="slot" id="slot3" style="background:#808080;">3</div>
+  </div>
+
+  <!-- Three.js Library & PointerLock Controls -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
 
   <script>
-    // 1. إعداد المشهد والكاميرا والإضاءة
+    // 1. Setup Scene, Camera, and Renderer
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87ceeb); // لون السماء
-    scene.fog = new THREE.Fog(0x87ceeb, 10, 60);
+    scene.background = new THREE.Color(0x87ceeb); // Sky blue
+    scene.fog = new THREE.Fog(0x87ceeb, 10, 80);
 
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
+    // 2. Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
 
@@ -63,38 +111,54 @@
     dirLight.position.set(20, 40, 20);
     scene.add(dirLight);
 
-    // 2. نظام التحكم (PointerLockControls)
+    // 3. PointerLock Controls (First-Person View)
     const controls = new THREE.PointerLockControls(camera, document.body);
     const instructions = document.getElementById('instructions');
 
     instructions.addEventListener('click', () => controls.lock());
     controls.addEventListener('lock', () => instructions.style.display = 'none');
-    controls.addEventListener('unlock', () => instructions.style.display = 'block');
+    controls.addEventListener('unlock', () => instructions.style.display = 'flex');
 
     scene.add(controls.getObject());
 
-    // 3. بناء عالم المكعبات (Voxel World)
-    const objects = []; // القائمة لتتبع المكعبات القابلة للكسر والتصادم
-    const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
-    
-    // خامة المادة لسطح العشب
-    const grassMaterial = new THREE.MeshLambertMaterial({ color: 0x4aa344 });
-    const dirtMaterial = new THREE.MeshLambertMaterial({ color: 0x8b5a2b });
+    // 4. Materials & Hotbar System
+    const materials = [
+      new THREE.MeshLambertMaterial({ color: 0x4aa344 }), // Grass
+      new THREE.MeshLambertMaterial({ color: 0x8b5a2b }), // Dirt
+      new THREE.MeshLambertMaterial({ color: 0x808080 })  // Stone
+    ];
+    let currentMaterialIndex = 0;
 
-    // إنشاء أرضية 16x16
-    for (let x = -8; x < 8; x++) {
-      for (let z = -8; z < 8; z++) {
-        const cube = new THREE.Mesh(boxGeometry, grassMaterial);
+    window.addEventListener('keydown', (e) => {
+      if (e.key === '1') setMaterial(0);
+      if (e.key === '2') setMaterial(1);
+      if (e.key === '3') setMaterial(2);
+    });
+
+    function setMaterial(index) {
+      currentMaterialIndex = index;
+      document.querySelectorAll('.slot').forEach((slot, i) => {
+        slot.classList.toggle('active', i === index);
+      });
+    }
+
+    // 5. Build Voxel World
+    const objects = [];
+    const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const worldSize = 16;
+
+    for (let x = -worldSize; x < worldSize; x++) {
+      for (let z = -worldSize; z < worldSize; z++) {
+        const cube = new THREE.Mesh(boxGeometry, materials[0]);
         cube.position.set(x, 0, z);
         scene.add(cube);
         objects.push(cube);
       }
     }
 
-    // موقع البداية للكاميرا فوق الأرض
-    controls.getObject().position.set(0, 2, 0);
+    controls.getObject().position.set(0, 3, 0);
 
-    // 4. نظام الحركة والفيزياء
+    // 6. Player Physics & Movement
     let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
     let canJump = false;
     let velocity = new THREE.Vector3();
@@ -106,7 +170,7 @@
       if (e.code === 'KeyA' || e.code === 'ArrowLeft') moveLeft = true;
       if (e.code === 'KeyD' || e.code === 'ArrowRight') moveRight = true;
       if (e.code === 'Space' && canJump) {
-        velocity.y += 10;
+        velocity.y += 12;
         canJump = false;
       }
     });
@@ -118,9 +182,9 @@
       if (e.code === 'KeyD' || e.code === 'ArrowRight') moveRight = false;
     });
 
-    // 5. ميكانيكية البناء والتكسير باستخدام Raycaster (أزرار الماوس)
+    // 7. Raycasting for Breaking and Placing Blocks
     const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2(0, 0); // منتصف الشاشة
+    const mouse = new THREE.Vector2(0, 0);
 
     window.addEventListener('mousedown', (e) => {
       if (!controls.isLocked) return;
@@ -131,14 +195,13 @@
       if (intersects.length > 0) {
         const intersect = intersects[0];
 
-        // النقر الأيسر (Button 0): تكسير المكعب
-        if (e.button === 0) {
+        if (e.button === 0) { 
+          // Left Click: Break Block
           scene.remove(intersect.object);
           objects.splice(objects.indexOf(intersect.object), 1);
-        }
-        // النقر الأيمن (Button 2): بناء مكعب جديد فوق الوجه المحدد
-        else if (e.button === 2) {
-          const newCube = new THREE.Mesh(boxGeometry, dirtMaterial);
+        } else if (e.button === 2) { 
+          // Right Click: Place Block
+          const newCube = new THREE.Mesh(boxGeometry, materials[currentMaterialIndex]);
           newCube.position.copy(intersect.object.position).add(intersect.face.normal);
           scene.add(newCube);
           objects.push(newCube);
@@ -146,10 +209,9 @@
       }
     });
 
-    // إلغاء قائمة القائمة القافزة عند الضغط بزر الماوس الأيمن
     window.addEventListener('contextmenu', e => e.preventDefault());
 
-    // 6. حلقة التحديث والرسم (Game Loop)
+    // 8. Game Loop
     let prevTime = performance.now();
 
     function animate() {
@@ -161,26 +223,32 @@
 
         velocity.x -= velocity.x * 10.0 * delta;
         velocity.z -= velocity.z * 10.0 * delta;
-        velocity.y -= 25.0 * delta; // قوة الجاذبية
+        velocity.y -= 30.0 * delta;
 
         direction.z = Number(moveForward) - Number(moveBackward);
         direction.x = Number(moveRight) - Number(moveLeft);
         direction.normalize();
 
-        if (moveForward || moveBackward) velocity.z -= direction.z * 40.0 * delta;
-        if (moveLeft || moveRight) velocity.x -= direction.x * 40.0 * delta;
+        if (moveForward || moveBackward) velocity.z -= direction.z * 50.0 * delta;
+        if (moveLeft || moveRight) velocity.x -= direction.x * 50.0 * delta;
 
         controls.moveRight(-velocity.x * delta);
         controls.moveForward(-velocity.z * delta);
         controls.getObject().position.y += velocity.y * delta;
 
-        // التصادم البسيط مع مستوى الأرض
+        // Ground Collision
         if (controls.getObject().position.y < 1.6) {
           velocity.y = 0;
           controls.getObject().position.y = 1.6;
           canJump = true;
         }
-        
+
+        // Void Respawn
+        if (controls.getObject().position.y < -20) {
+          controls.getObject().position.set(0, 3, 0);
+          velocity.set(0, 0, 0);
+        }
+
         prevTime = time;
       }
 
@@ -189,7 +257,7 @@
 
     animate();
 
-    // ضبط العرض عند تغيير حجم الشاشة
+    // Handle Window Resize
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
