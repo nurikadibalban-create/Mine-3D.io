@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <title>MineFun Clone - GitHub</title>
+  <style>
+    body { margin: 0; overflow: hidden; font-family: sans-serif; }
+    #instructions {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      text-align: center;
+      background: rgba(0,0,0,0.8);
+      padding: 20px 40px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 20px;
+    }
+    #crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 10px;
+      height: 10px;
+      background: white;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="instructions">
+    <h2>اضغط هنا للبدء باللعب</h2>
+    <p>التحرك: WASD | القفز: Space | النظر: تحريك الماوس</p>
+  </div>
+  <div id="crosshair"></div>
+
+  <!-- مكتبات Three.js للرسم والتحكم بالشخص الأول -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
+
+  <script>
+    // 1. إعداد المشهد والضوء
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb); // لون السماء
+    scene.fog = new THREE.Fog(0x87ceeb, 10, 50);
+
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(20, 40, 20);
+    scene.add(light);
+    scene.add(new THREE.AmbientLight(0x606060));
+
+    // 2. إعداد التحكم (PointerLockControls)
+    const controls = new THREE.PointerLockControls(camera, document.body);
+    const instructions = document.getElementById('instructions');
+
+    instructions.addEventListener('click', () => controls.lock());
+    controls.addEventListener('lock', () => instructions.style.display = 'none');
+    controls.addEventListener('unlock', () => instructions.style.display = 'block');
+
+    scene.add(controls.getObject());
+
+    // 3. متغيّرات الفيزياء والحركة
+    let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+    let canJump = false;
+    let velocity = new THREE.Vector3();
+    let direction = new THREE.Vector3();
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyW' || e.code === 'ArrowUp') moveForward = true;
+      if (e.code === 'KeyS' || e.code === 'ArrowDown') moveBackward = true;
+      if (e.code === 'KeyA' || e.code === 'ArrowLeft') moveLeft = true;
+      if (e.code === 'KeyD' || e.code === 'ArrowRight') moveRight = true;
+      if (e.code === 'Space' && canJump) {
+        velocity.y += 12; // قوة القفز
+        canJump = false;
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'KeyW' || e.code === 'ArrowUp') moveForward = false;
+      if (e.code === 'KeyS' || e.code === 'ArrowDown') moveBackward = false;
+      if (e.code === 'KeyA' || e.code === 'ArrowLeft') moveLeft = false;
+      if (e.code === 'KeyD' || e.code === 'ArrowRight') moveRight = false;
+    });
+
+    // 4. بناء خريطة باركور / مكعبات (Parkour Map)
+    const blocks = [];
+    const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const grassMaterial = new THREE.MeshLambertMaterial({ color: 0x4aa344 });
+    const lavaMaterial = new THREE.MeshLambertMaterial({ color: 0xff3300 });
+
+    // إنشـاء منصة البداية
+    function createBlock(x, y, z, mat = grassMaterial) {
+      const block = new THREE.Mesh(boxGeometry, mat);
+      block.position.set(x, y, z);
+      scene.add(block);
+      blocks.push(block);
+    }
+
+    // منصة البداية (4x4)
+    for (let x = -2; x <= 2; x++) {
+      for (let z = -2; z <= 2; z++) {
+        createBlock(x, 0, z);
+      }
+    }
+
+    // مسار باركور مكعبات مثل MineFun Obby
+    for (let i = 1; i <= 15; i++) {
+      createBlock(0, i * 0.5, -i * 3);
+    }
+
+    // موقع بداية اللاعب فوق المنصة
+    controls.getObject().position.set(0, 3, 0);
+
+    // 5. حلقة التحديث والرسم (Game Loop)
+    let prevTime = performance.now();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const time = performance.now();
+      const delta = (time - prevTime) / 1000;
+
+      if (controls.isLocked) {
+        // الاحتكاك والجاذبية
+        velocity.x -= velocity.x * 10.0 * delta;
+        velocity.z -= velocity.z * 10.0 * delta;
+        velocity.y -= 30.0 * delta; // قوة الجاذبية
+
+        direction.z = Number(moveForward) - Number(moveBackward);
+        direction.x = Number(moveRight) - Number(moveLeft);
+        direction.normalize();
+
+        if (moveForward || moveBackward) velocity.z -= direction.z * 50.0 * delta;
+        if (moveLeft || moveRight) velocity.x -= direction.x * 50.0 * delta;
+
+        controls.moveRight(-velocity.x * delta);
+        controls.moveForward(-velocity.z * delta);
+        controls.getObject().position.y += velocity.y * delta;
+
+        // السقوط على الأرض / المكعبات
+        if (controls.getObject().position.y < 1.6) {
+          velocity.y = 0;
+          controls.getObject().position.y = 1.6;
+          canJump = true;
+        }
+
+        // إعـادة السقوط إن سقط اللاعب في الفراغ
+        if (controls.getObject().position.y < -10) {
+          controls.getObject().position.set(0, 3, 0);
+          velocity.set(0, 0, 0);
+        }
+      }
+
+      prevTime = time;
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
