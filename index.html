@@ -1,293 +1,399 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>MineFun.io Clone</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { overflow: hidden; font-family: 'Arial', sans-serif; user-select: none; }
-    
-    /* Overlay Screen */
-    #overlay {
-      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(15, 23, 42, 0.85); color: #fff;
-      display: flex; flex-direction: column; justify-content: center; align-items: center;
-      z-index: 100; cursor: pointer;
-    }
-    #overlay h1 { font-size: 3rem; color: #38bdf8; text-shadow: 0 4px 10px rgba(0,0,0,0.5); margin-bottom: 10px; }
-    #overlay p { font-size: 1.2rem; color: #cbd5e1; margin-bottom: 5px; }
-
-    /* Crosshair */
-    #crosshair {
-      position: absolute; top: 50%; left: 50%; width: 12px; height: 12px;
-      border: 2px solid rgba(255, 255, 255, 0.8); border-radius: 50%;
-      transform: translate(-50%, -50%); pointer-events: none; z-index: 10;
-    }
-    #crosshair::after {
-      content: ''; position: absolute; top: 4px; left: 4px; width: 2px; height: 2px;
-      background: white; border-radius: 50%;
-    }
-
-    /* HUD UI */
-    #hud {
-      position: absolute; top: 20px; left: 20px; z-index: 10;
-      display: flex; flex-direction: column; gap: 8px; color: white;
-      font-weight: bold; font-size: 1.1rem; text-shadow: 1px 1px 3px black;
-    }
-    .bar-container { width: 200px; height: 20px; background: rgba(0,0,0,0.5); border: 2px solid #fff; border-radius: 10px; overflow: hidden; }
-    #health-bar { width: 100%; height: 100%; background: #ef4444; transition: width 0.2s; }
-
-    /* Hotbar */
-    #hotbar {
-      position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-      display: flex; gap: 10px; background: rgba(0, 0, 0, 0.6); padding: 10px;
-      border-radius: 12px; border: 2px solid rgba(255,255,255,0.2); z-index: 10;
-    }
-    .slot {
-      width: 50px; height: 50px; border: 2px solid #64748b; border-radius: 8px;
-      display: flex; justify-content: center; align-items: center; color: white;
-      font-weight: bold; background: rgba(255,255,255,0.1); font-size: 0.9rem;
-    }
-    .slot.active { border-color: #38bdf8; box-shadow: 0 0 12px #38bdf8; background: rgba(56, 189, 248, 0.2); }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MineFun - 2D Voxel Game</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #game-container {
+            position: relative;
+            border: 4px solid #333;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        canvas {
+            background-color: #87CEEB;
+            display: block;
+            cursor: crosshair;
+        }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            pointer-events: none;
+            font-size: 14px;
+            text-shadow: 2px 2px 0 #000;
+        }
+        #hotbar {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 5px;
+            border-radius: 5px;
+            border: 2px solid #555;
+        }
+        .slot {
+            width: 44px;
+            height: 44px;
+            border: 2px solid #777;
+            margin: 0 3px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.1);
+            position: relative;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .slot.selected {
+            border-color: #fff;
+            box-shadow: 0 0 8px #fff;
+            background: rgba(255, 255, 255, 0.3);
+        }
+        .block-preview {
+            width: 20px;
+            height: 20px;
+            border: 1px solid #000;
+        }
+        .count {
+            position: absolute;
+            bottom: 2px;
+            right: 4px;
+            text-shadow: 1px 1px 0 #000;
+        }
+    </style>
 </head>
 <body>
 
-  <div id="overlay">
-    <h1>MINEFUN.IO</h1>
-    <p>اضغط للبدء باللعب</p>
-    <p style="font-size: 0.9rem; color: #94a3b8; margin-top: 15px;">
-      WASD: حركة | SPACE: قفز | اليسار: تكسير/هجوم | اليمين: بناء | 1-4: تغيير السلاح/المكعبات
-    </p>
-  </div>
+<div id="game-container">
+    <canvas id="canvas" width="800" height="480"></canvas>
+    <div id="ui">
+        <div>Left Click: Mine | Right Click: Place</div>
+        <div>A/D or Arrows: Move | Space/W: Jump</div>
+        <div>Keys 1-7: Select Hotbar Slot</div>
+    </div>
+    <div id="hotbar"></div>
+</div>
 
-  <div id="crosshair"></div>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
 
-  <div id="hud">
-    <div>الصحة: <span id="hp-text">100</span>/100</div>
-    <div class="bar-container"><div id="health-bar"></div></div>
-  </div>
+// --- GAME CONFIGURATION ---
+const TILE_SIZE = 32;
+const WORLD_WIDTH = 100;  // Tiles wide
+const WORLD_HEIGHT = 60;  // Tiles high
+const GRAVITY = 0.5;
 
-  <div id="hotbar">
-    <div class="slot active" id="slot1">1<br>سيف</div>
-    <div class="slot" id="slot2">2<br>عشب</div>
-    <div class="slot" id="slot3">3<br>تراب</div>
-    <div class="slot" id="slot4">4<br>حجر</div>
-  </div>
+// --- BLOCK TYPES & PROPERTIES ---
+const BLOCKS = {
+    AIR: 0,
+    GRASS: 1,
+    DIRT: 2,
+    STONE: 3,
+    COAL: 4,
+    IRON: 5,
+    GOLD: 6,
+    DIAMOND: 7
+};
 
-  <!-- Three.js Libraries -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
+const BLOCK_DATA = {
+    [BLOCKS.GRASS]:   { name: 'Grass',   color: '#55a826', solid: true },
+    [BLOCKS.DIRT]:    { name: 'Dirt',    color: '#866043', solid: true },
+    [BLOCKS.STONE]:   { name: 'Stone',   color: '#757575', solid: true },
+    [BLOCKS.COAL]:    { name: 'Coal',    color: '#333333', solid: true },
+    [BLOCKS.IRON]:    { name: 'Iron',    color: '#d1b18a', solid: true },
+    [BLOCKS.GOLD]:    { name: 'Gold',    color: '#fada5e', solid: true },
+    [BLOCKS.DIAMOND]: { name: 'Diamond', color: '#4ee2ec', solid: true }
+};
 
-  <script>
-    // 1. Scene & Setup
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x38bdf8); // السماء
-    scene.fog = new THREE.FogExp2(0x38bdf8, 0.015);
+// --- GAME STATE ---
+let world = [];
+let keys = {};
+let selectedSlot = 0;
 
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = true;
-    document.body.appendChild(renderer.domElement);
+const player = {
+    x: (WORLD_WIDTH / 2) * TILE_SIZE,
+    y: 0,
+    width: 20,
+    height: 52,
+    vx: 0,
+    vy: 0,
+    speed: 3.5,
+    jumpStrength: 9.5,
+    grounded: false
+};
 
-    // 2. Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-    scene.add(ambientLight);
+const inventory = [
+    { type: BLOCKS.GRASS, count: 10 },
+    { type: BLOCKS.DIRT, count: 20 },
+    { type: BLOCKS.STONE, count: 10 },
+    { type: BLOCKS.COAL, count: 0 },
+    { type: BLOCKS.IRON, count: 0 },
+    { type: BLOCKS.GOLD, count: 0 },
+    { type: BLOCKS.DIAMOND, count: 0 }
+];
 
-    const sunLight = new THREE.DirectionalLight(0xffffff, 0.6);
-    sunLight.position.set(30, 50, 20);
-    sunLight.castShadow = true;
-    scene.add(sunLight);
+// --- WORLD GENERATION ---
+function generateWorld() {
+    world = Array(WORLD_HEIGHT).fill(0).map(() => Array(WORLD_WIDTH).fill(BLOCKS.AIR));
 
-    // 3. Controls & Controls Overlay
-    const controls = new THREE.PointerLockControls(camera, document.body);
-    const overlay = document.getElementById('overlay');
-
-    overlay.addEventListener('click', () => controls.lock());
-    controls.addEventListener('lock', () => overlay.style.display = 'none');
-    controls.addEventListener('unlock', () => overlay.style.display = 'flex');
-
-    scene.add(controls.getObject());
-
-    // 4. Player Weapon (Sword Object)
-    const weaponGroup = new THREE.Group();
-    const bladeGeo = new THREE.BoxGeometry(0.08, 0.7, 0.08);
-    const bladeMat = new THREE.MeshLambertMaterial({ color: 0xe2e8f0 });
-    const blade = new THREE.Mesh(bladeGeo, bladeMat);
-    blade.position.y = 0.35;
-
-    const handleGeo = new THREE.BoxGeometry(0.1, 0.2, 0.1);
-    const handleMat = new THREE.MeshLambertMaterial({ color: 0x78350f });
-    const handle = new THREE.Mesh(handleGeo, handleMat);
-
-    weaponGroup.add(blade);
-    weaponGroup.add(handle);
-    weaponGroup.position.set(0.3, -0.3, -0.5);
-    weaponGroup.rotation.y = -Math.PI / 6;
-    camera.add(weaponGroup);
-
-    // 5. Materials & Hotbar Selection
-    const materials = [
-      null, // Index 0 is Sword
-      new THREE.MeshLambertMaterial({ color: 0x22c55e }), // Grass
-      new THREE.MeshLambertMaterial({ color: 0xa16207 }), // Dirt
-      new THREE.MeshLambertMaterial({ color: 0x64748b })  // Stone
-    ];
-    let selectedSlot = 0; // 0 = Sword, 1 = Grass, 2 = Dirt, 3 = Stone
-
-    window.addEventListener('keydown', (e) => {
-      if (['1','2','3','4'].includes(e.key)) {
-        selectedSlot = parseInt(e.key) - 1;
-        document.querySelectorAll('.slot').forEach((s, idx) => {
-          s.classList.toggle('active', idx === selectedSlot);
-        });
-        weaponGroup.visible = (selectedSlot === 0);
-      }
-    });
-
-    // 6. World Generation
-    const objects = [];
-    const boxGeo = new THREE.BoxGeometry(1, 1, 1);
-    const edgesGeo = new THREE.EdgesGeometry(boxGeo);
-    const lineMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 1 });
-
-    function createBlock(x, y, z, matIndex) {
-      const cube = new THREE.Mesh(boxGeo, materials[matIndex]);
-      cube.position.set(x, y, z);
-      const wireframe = new THREE.LineSegments(edgesGeo, lineMat);
-      cube.add(wireframe);
-      scene.add(cube);
-      objects.push(cube);
-    }
-
-    // Build Parkour Map Platform
-    for (let x = -10; x <= 10; x++) {
-      for (let z = -10; z <= 10; z++) {
-        createBlock(x, 0, z, 1);
-      }
-    }
-    // Parkour Pillars
-    for (let i = 1; i <= 5; i++) {
-      createBlock(12 + i * 3, i * 2, 0, 3);
-    }
-
-    controls.getObject().position.set(0, 3, 0);
-
-    // 7. Interaction: Mining, Building, Attacking
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2(0, 0);
-    let isSwinging = false;
-
-    window.addEventListener('mousedown', (e) => {
-      if (!controls.isLocked) return;
-
-      // Sword Swing Animation
-      if (selectedSlot === 0 && !isSwinging) {
-        isSwinging = true;
-        let angle = 0;
-        const swingInterval = setInterval(() => {
-          angle += 0.3;
-          weaponGroup.rotation.x = -Math.sin(angle) * 1.2;
-          if (angle >= Math.PI) {
-            clearInterval(swingInterval);
-            weaponGroup.rotation.x = 0;
-            isSwinging = false;
-          }
-        }, 20);
-      }
-
-      raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(objects);
-
-      if (intersects.length > 0) {
-        const hit = intersects[0];
-
-        if (e.button === 0 && selectedSlot !== 0) { 
-          // Break block with blocks selected
-          scene.remove(hit.object);
-          objects.splice(objects.indexOf(hit.object), 1);
-        } else if (e.button === 2 && selectedSlot !== 0) { 
-          // Build block
-          const pos = hit.object.position.clone().add(hit.face.normal);
-          createBlock(pos.x, pos.y, pos.z, selectedSlot);
-        }
-      }
-    });
-
-    window.addEventListener('contextmenu', e => e.preventDefault());
-
-    // 8. Movement Physics Loop
-    let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
-    let canJump = false;
-    let velocity = new THREE.Vector3();
-    let direction = new THREE.Vector3();
-
-    window.addEventListener('keydown', (e) => {
-      if (e.code === 'KeyW') moveForward = true;
-      if (e.code === 'KeyS') moveBackward = true;
-      if (e.code === 'KeyA') moveLeft = true;
-      if (e.code === 'KeyD') moveRight = true;
-      if (e.code === 'Space' && canJump) { velocity.y += 12; canJump = false; }
-    });
-
-    window.addEventListener('keyup', (e) => {
-      if (e.code === 'KeyW') moveForward = false;
-      if (e.code === 'KeyS') moveBackward = false;
-      if (e.code === 'KeyA') moveLeft = false;
-      if (e.code === 'KeyD') moveRight = false;
-    });
-
-    let prevTime = performance.now();
-
-    function animate() {
-      requestAnimationFrame(animate);
-
-      if (controls.isLocked) {
-        const time = performance.now();
-        const delta = (time - prevTime) / 1000;
-
-        velocity.x -= velocity.x * 10.0 * delta;
-        velocity.z -= velocity.z * 10.0 * delta;
-        velocity.y -= 30.0 * delta; // Gravity
-
-        direction.z = Number(moveForward) - Number(moveBackward);
-        direction.x = Number(moveRight) - Number(moveLeft);
-        direction.normalize();
-
-        if (moveForward || moveBackward) velocity.z -= direction.z * 50.0 * delta;
-        if (moveLeft || moveRight) velocity.x -= direction.x * 50.0 * delta;
-
-        controls.moveRight(-velocity.x * delta);
-        controls.moveForward(-velocity.z * delta);
-        controls.getObject().position.y += velocity.y * delta;
-
-        // Ground Floor Check
-        if (controls.getObject().position.y < 2) {
-          velocity.y = 0;
-          controls.getObject().position.y = 2;
-          canJump = true;
+    // Simple heightmap terrain generation
+    let groundHeight = Math.floor(WORLD_HEIGHT / 3);
+    
+    for (let x = 0; x < WORLD_WIDTH; x++) {
+        // Vary height slightly
+        if (x > 0 && Math.random() < 0.4) {
+            groundHeight += Math.random() < 0.5 ? 1 : -1;
+            groundHeight = Math.max(10, Math.min(WORLD_HEIGHT - 20, groundHeight));
         }
 
-        // Void Fall / Respawn
-        if (controls.getObject().position.y < -30) {
-          controls.getObject().position.set(0, 5, 0);
-          velocity.set(0, 0, 0);
+        for (let y = groundHeight; y < WORLD_HEIGHT; y++) {
+            if (y === groundHeight) {
+                world[y][x] = BLOCKS.GRASS;
+            } else if (y < groundHeight + 4) {
+                world[y][x] = BLOCKS.DIRT;
+            } else {
+                // Stone layer with ores
+                const rand = Math.random();
+                if (rand < 0.01) world[y][x] = BLOCKS.DIAMOND;
+                else if (rand < 0.03) world[y][x] = BLOCKS.GOLD;
+                else if (rand < 0.07) world[y][x] = BLOCKS.IRON;
+                else if (rand < 0.12) world[y][x] = BLOCKS.COAL;
+                else world[y][x] = BLOCKS.STONE;
+            }
         }
-
-        prevTime = time;
-      }
-
-      renderer.render(scene, camera);
     }
 
-    animate();
+    // Spawn player above terrain
+    player.y = (groundHeight - 3) * TILE_SIZE;
+}
 
-    window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+// --- ENGINE & LOGIC ---
+function updatePlayer() {
+    // Horizontal Movement
+    if (keys['KeyA'] || keys['ArrowLeft']) player.vx = -player.speed;
+    else if (keys['KeyD'] || keys['ArrowRight']) player.vx = player.speed;
+    else player.vx = 0;
+
+    // Jumping
+    if ((keys['KeyW'] || keys['Space'] || keys['ArrowUp']) && player.grounded) {
+        player.vy = -player.jumpStrength;
+        player.grounded = false;
+    }
+
+    // Gravity
+    player.vy += GRAVITY;
+
+    // Apply Velocity & Horizontal Collision
+    player.x += player.vx;
+    handleCollision(true);
+
+    // Vertical Collision
+    player.y += player.vy;
+    player.grounded = false;
+    handleCollision(false);
+}
+
+function handleCollision(horizontal) {
+    const left = Math.floor(player.x / TILE_SIZE);
+    const right = Math.floor((player.x + player.width) / TILE_SIZE);
+    const top = Math.floor(player.y / TILE_SIZE);
+    const bottom = Math.floor((player.y + player.height) / TILE_SIZE);
+
+    for (let y = top; y <= bottom; y++) {
+        for (let x = left; x <= right; x++) {
+            if (isSolid(x, y)) {
+                if (horizontal) {
+                    if (player.vx > 0) player.x = x * TILE_SIZE - player.width;
+                    if (player.vx < 0) player.x = (x + 1) * TILE_SIZE;
+                    player.vx = 0;
+                } else {
+                    if (player.vy > 0) {
+                        player.y = y * TILE_SIZE - player.height;
+                        player.grounded = true;
+                        player.vy = 0;
+                    } else if (player.vy < 0) {
+                        player.y = (y + 1) * TILE_SIZE;
+                        player.vy = 0;
+                    }
+                }
+            }
+        }
+    }
+}
+
+function isSolid(x, y) {
+    if (x < 0 || x >= WORLD_WIDTH || y < 0 || y >= WORLD_HEIGHT) return true;
+    const block = world[y][x];
+    return block !== BLOCKS.AIR && BLOCK_DATA[block]?.solid;
+}
+
+// --- RENDER ---
+function render() {
+    // Camera follow player
+    const cameraX = player.x - canvas.width / 2 + player.width / 2;
+    const cameraY = player.y - canvas.height / 2 + player.height / 2;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    ctx.translate(-Math.floor(cameraX), -Math.floor(cameraY));
+
+    // Render Visible Blocks
+    const startX = Math.max(0, Math.floor(cameraX / TILE_SIZE));
+    const endX = Math.min(WORLD_WIDTH, Math.ceil((cameraX + canvas.width) / TILE_SIZE));
+    const startY = Math.max(0, Math.floor(cameraY / TILE_SIZE));
+    const endY = Math.min(WORLD_HEIGHT, Math.ceil((cameraY + canvas.height) / TILE_SIZE));
+
+    for (let y = startY; y < endY; y++) {
+        for (let x = startX; x < endX; x++) {
+            const block = world[y][x];
+            if (block !== BLOCKS.AIR) {
+                ctx.fillStyle = BLOCK_DATA[block].color;
+                ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+                ctx.strokeRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            }
+        }
+    }
+
+    // Render Player
+    ctx.fillStyle = '#e74c3c';
+    ctx.fillRect(player.x, player.y, player.width, player.height);
+    // Eye detail
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(player.x + 12, player.y + 8, 4, 4);
+
+    ctx.restore();
+}
+
+// --- HOTBAR & INVENTORY UI ---
+function renderHotbar() {
+    const hotbarEl = document.getElementById('hotbar');
+    hotbarEl.innerHTML = '';
+
+    inventory.forEach((item, index) => {
+        const slot = document.createElement('div');
+        slot.className = `slot ${index === selectedSlot ? 'selected' : ''}`;
+
+        const preview = document.createElement('div');
+        preview.className = 'block-preview';
+        preview.style.backgroundColor = BLOCK_DATA[item.type].color;
+
+        const count = document.createElement('div');
+        count.className = 'count';
+        count.innerText = item.count;
+
+        slot.appendChild(preview);
+        slot.appendChild(count);
+        hotbarEl.appendChild(slot);
     });
-  </script>
+}
+
+// --- INTERACTION ---
+function handleMouseInteraction(e, isRightClick) {
+    const rect = canvas.getBoundingClientRect();
+    const cameraX = player.x - canvas.width / 2 + player.width / 2;
+    const cameraY = player.y - canvas.height / 2 + player.height / 2;
+
+    const mouseX = e.clientX - rect.left + cameraX;
+    const mouseY = e.clientY - rect.top + cameraY;
+
+    const tileX = Math.floor(mouseX / TILE_SIZE);
+    const tileY = Math.floor(mouseY / TILE_SIZE);
+
+    // Distance check (Reach distance)
+    const pTileX = Math.floor((player.x + player.width / 2) / TILE_SIZE);
+    const pTileY = Math.floor((player.y + player.height / 2) / TILE_SIZE);
+    const dist = Math.hypot(tileX - pTileX, tileY - pTileY);
+
+    if (dist > 6) return; // Out of reach
+
+    if (!isRightClick) {
+        // Break block
+        const targetBlock = world[tileY]?.[tileX];
+        if (targetBlock && targetBlock !== BLOCKS.AIR) {
+            world[tileY][tileX] = BLOCKS.AIR;
+            const invItem = inventory.find(i => i.type === targetBlock);
+            if (invItem) invItem.count++;
+            renderHotbar();
+        }
+    } else {
+        // Place block
+        const activeItem = inventory[selectedSlot];
+        if (activeItem && activeItem.count > 0 && world[tileY]?.[tileX] === BLOCKS.AIR) {
+            // Check player overlap before placing
+            const blockRect = { x: tileX * TILE_SIZE, y: tileY * TILE_SIZE, w: TILE_SIZE, h: TILE_SIZE };
+            const pRect = { x: player.x, y: player.y, w: player.width, h: player.height };
+
+            if (!(pRect.x < blockRect.x + blockRect.w &&
+                  pRect.x + pRect.w > blockRect.x &&
+                  pRect.y < blockRect.y + blockRect.h &&
+                  pRect.y + pRect.h > blockRect.y)) {
+                
+                world[tileY][tileX] = activeItem.type;
+                activeItem.count--;
+                renderHotbar();
+            }
+        }
+    }
+}
+
+// --- EVENT LISTENERS ---
+window.addEventListener('keydown', (e) => {
+    keys[e.code] = true;
+    if (e.code.startsWith('Digit')) {
+        const num = parseInt(e.code.replace('Digit', '')) - 1;
+        if (num >= 0 && num < inventory.length) {
+            selectedSlot = num;
+            renderHotbar();
+        }
+    }
+});
+
+window.addEventListener('keyup', (e) => {
+    keys[e.code] = false;
+});
+
+canvas.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    handleMouseInteraction(e, e.button === 2);
+});
+
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+// --- GAME LOOP ---
+function loop() {
+    updatePlayer();
+    render();
+    requestAnimationFrame(loop);
+}
+
+// Start Game
+generateWorld();
+renderHotbar();
+loop();
+</script>
 </body>
 </html>
