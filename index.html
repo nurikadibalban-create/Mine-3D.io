@@ -2,166 +2,242 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>MineFun Real Voxel</title>
+  <title>MineFun.io Clone</title>
   <style>
-    body { margin: 0; overflow: hidden; font-family: sans-serif; user-select: none; }
-    #instructions {
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { overflow: hidden; font-family: 'Arial', sans-serif; user-select: none; }
+    
+    /* Overlay Screen */
+    #overlay {
       position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.75); color: #fff;
+      background: rgba(15, 23, 42, 0.85); color: #fff;
       display: flex; flex-direction: column; justify-content: center; align-items: center;
-      cursor: pointer; z-index: 10;
+      z-index: 100; cursor: pointer;
     }
+    #overlay h1 { font-size: 3rem; color: #38bdf8; text-shadow: 0 4px 10px rgba(0,0,0,0.5); margin-bottom: 10px; }
+    #overlay p { font-size: 1.2rem; color: #cbd5e1; margin-bottom: 5px; }
+
+    /* Crosshair */
     #crosshair {
-      position: absolute; top: 50%; left: 50%; width: 10px; height: 10px;
-      background: rgba(255, 255, 255, 0.9); border: 1px solid #000;
-      transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none; z-index: 5;
+      position: absolute; top: 50%; left: 50%; width: 12px; height: 12px;
+      border: 2px solid rgba(255, 255, 255, 0.8); border-radius: 50%;
+      transform: translate(-50%, -50%); pointer-events: none; z-index: 10;
     }
+    #crosshair::after {
+      content: ''; position: absolute; top: 4px; left: 4px; width: 2px; height: 2px;
+      background: white; border-radius: 50%;
+    }
+
+    /* HUD UI */
+    #hud {
+      position: absolute; top: 20px; left: 20px; z-index: 10;
+      display: flex; flex-direction: column; gap: 8px; color: white;
+      font-weight: bold; font-size: 1.1rem; text-shadow: 1px 1px 3px black;
+    }
+    .bar-container { width: 200px; height: 20px; background: rgba(0,0,0,0.5); border: 2px solid #fff; border-radius: 10px; overflow: hidden; }
+    #health-bar { width: 100%; height: 100%; background: #ef4444; transition: width 0.2s; }
+
+    /* Hotbar */
+    #hotbar {
+      position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 10px; background: rgba(0, 0, 0, 0.6); padding: 10px;
+      border-radius: 12px; border: 2px solid rgba(255,255,255,0.2); z-index: 10;
+    }
+    .slot {
+      width: 50px; height: 50px; border: 2px solid #64748b; border-radius: 8px;
+      display: flex; justify-content: center; align-items: center; color: white;
+      font-weight: bold; background: rgba(255,255,255,0.1); font-size: 0.9rem;
+    }
+    .slot.active { border-color: #38bdf8; box-shadow: 0 0 12px #38bdf8; background: rgba(56, 189, 248, 0.2); }
   </style>
 </head>
 <body>
 
-  <div id="instructions">
-    <h1>MineFun Game</h1>
-    <p>اضغط في أي مكان للبدء</p>
-    <p><strong>WASD</strong>: تحرك | <strong>SPACE</strong>: قفز</p>
-    <p><strong>يسار الماوس</strong>: تكسير | <strong>يمين الماوس</strong>: بناء</p>
+  <div id="overlay">
+    <h1>MINEFUN.IO</h1>
+    <p>اضغط للبدء باللعب</p>
+    <p style="font-size: 0.9rem; color: #94a3b8; margin-top: 15px;">
+      WASD: حركة | SPACE: قفز | اليسار: تكسير/هجوم | اليمين: بناء | 1-4: تغيير السلاح/المكعبات
+    </p>
   </div>
 
   <div id="crosshair"></div>
 
+  <div id="hud">
+    <div>الصحة: <span id="hp-text">100</span>/100</div>
+    <div class="bar-container"><div id="health-bar"></div></div>
+  </div>
+
+  <div id="hotbar">
+    <div class="slot active" id="slot1">1<br>سيف</div>
+    <div class="slot" id="slot2">2<br>عشب</div>
+    <div class="slot" id="slot3">3<br>تراب</div>
+    <div class="slot" id="slot4">4<br>حجر</div>
+  </div>
+
+  <!-- Three.js Libraries -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
 
   <script>
+    // 1. Scene & Setup
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x78a7ff); // لون سماء ماين كرافت
-    scene.fog = new THREE.Fog(0x78a7ff, 10, 60);
+    scene.background = new THREE.Color(0x38bdf8); // السماء
+    scene.fog = new THREE.FogExp2(0x38bdf8, 0.015);
 
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
     document.body.appendChild(renderer.domElement);
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    // 2. Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
     scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
-    dirLight.position.set(20, 40, 20);
-    scene.add(dirLight);
+    const sunLight = new THREE.DirectionalLight(0xffffff, 0.6);
+    sunLight.position.set(30, 50, 20);
+    sunLight.castShadow = true;
+    scene.add(sunLight);
 
+    // 3. Controls & Controls Overlay
     const controls = new THREE.PointerLockControls(camera, document.body);
-    const instructions = document.getElementById('instructions');
+    const overlay = document.getElementById('overlay');
 
-    instructions.addEventListener('click', () => controls.lock());
-    controls.addEventListener('lock', () => instructions.style.display = 'none');
-    controls.addEventListener('unlock', () => instructions.style.display = 'flex');
+    overlay.addEventListener('click', () => controls.lock());
+    controls.addEventListener('lock', () => overlay.style.display = 'none');
+    controls.addEventListener('unlock', () => overlay.style.display = 'flex');
 
     scene.add(controls.getObject());
 
-    // تحصيل صور خامات ماين كرافت المفتوحة
-    const textureLoader = new THREE.TextureLoader();
-    textureLoader.setCrossOrigin('anonymous');
+    // 4. Player Weapon (Sword Object)
+    const weaponGroup = new THREE.Group();
+    const bladeGeo = new THREE.BoxGeometry(0.08, 0.7, 0.08);
+    const bladeMat = new THREE.MeshLambertMaterial({ color: 0xe2e8f0 });
+    const blade = new THREE.Mesh(bladeGeo, bladeMat);
+    blade.position.y = 0.35;
 
-    // خامة العشب والتراب والحجر من خوادم ماين كرافت المجانية
-    const grassTopTexture = textureLoader.load('https://threejs.org/examples/textures/minecraft/grass.png');
-    const dirtTexture = textureLoader.load('https://threejs.org/examples/textures/minecraft/dirt.png');
-    
-    // ضبط جودة البكسل لتكون ضبابية مثل ماين كرافت (Pixel Art)
-    grassTopTexture.magFilter = THREE.NearestFilter;
-    dirtTexture.magFilter = THREE.NearestFilter;
+    const handleGeo = new THREE.BoxGeometry(0.1, 0.2, 0.1);
+    const handleMat = new THREE.MeshLambertMaterial({ color: 0x78350f });
+    const handle = new THREE.Mesh(handleGeo, handleMat);
 
-    // خامة كتل العشب (أعلى أخضر، والجانب تراب مع عشب)
-    const grassMaterials = [
-      new THREE.MeshLambertMaterial({ map: dirtTexture }), // جانب
-      new THREE.MeshLambertMaterial({ map: dirtTexture }), // جانب
-      new THREE.MeshLambertMaterial({ map: grassTopTexture }), // أعلى
-      new THREE.MeshLambertMaterial({ map: dirtTexture }), // أسفل
-      new THREE.MeshLambertMaterial({ map: dirtTexture }), // جانب
-      new THREE.MeshLambertMaterial({ map: dirtTexture })  // جانب
+    weaponGroup.add(blade);
+    weaponGroup.add(handle);
+    weaponGroup.position.set(0.3, -0.3, -0.5);
+    weaponGroup.rotation.y = -Math.PI / 6;
+    camera.add(weaponGroup);
+
+    // 5. Materials & Hotbar Selection
+    const materials = [
+      null, // Index 0 is Sword
+      new THREE.MeshLambertMaterial({ color: 0x22c55e }), // Grass
+      new THREE.MeshLambertMaterial({ color: 0xa16207 }), // Dirt
+      new THREE.MeshLambertMaterial({ color: 0x64748b })  // Stone
     ];
+    let selectedSlot = 0; // 0 = Sword, 1 = Grass, 2 = Dirt, 3 = Stone
 
+    window.addEventListener('keydown', (e) => {
+      if (['1','2','3','4'].includes(e.key)) {
+        selectedSlot = parseInt(e.key) - 1;
+        document.querySelectorAll('.slot').forEach((s, idx) => {
+          s.classList.toggle('active', idx === selectedSlot);
+        });
+        weaponGroup.visible = (selectedSlot === 0);
+      }
+    });
+
+    // 6. World Generation
     const objects = [];
-    const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
-    
-    // خامة الحدود حول كل مكعب لتحديد أطرافه وضمان تجسيمه 3D
-    const edgesGeometry = new THREE.EdgesGeometry(boxGeometry);
-    const lineMaterial = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 1 });
+    const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+    const edgesGeo = new THREE.EdgesGeometry(boxGeo);
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 1 });
 
-    function createBlock(x, y, z) {
-      const cube = new THREE.Mesh(boxGeometry, grassMaterials);
+    function createBlock(x, y, z, matIndex) {
+      const cube = new THREE.Mesh(boxGeo, materials[matIndex]);
       cube.position.set(x, y, z);
-      
-      // إضافة خطوط سوداء خفيفة على أطراف المكعب ليظهر بشكل متجسم
-      const wireframe = new THREE.LineSegments(edgesGeometry, lineMaterial);
+      const wireframe = new THREE.LineSegments(edgesGeo, lineMat);
       cube.add(wireframe);
-
       scene.add(cube);
       objects.push(cube);
     }
 
-    // بناء أرضية مع تضاريس متباينة الأرتفاع (مثل ماين كرافت)
-    const worldSize = 12;
-    for (let x = -worldSize; x <= worldSize; x++) {
-      for (let z = -worldSize; z <= worldSize; z++) {
-        // حساب الارتفاع لإنشاء تلال بسيطة
-        let height = Math.floor(Math.sin(x * 0.3) + Math.cos(z * 0.3));
-        createBlock(x, height, z);
+    // Build Parkour Map Platform
+    for (let x = -10; x <= 10; x++) {
+      for (let z = -10; z <= 10; z++) {
+        createBlock(x, 0, z, 1);
       }
     }
+    // Parkour Pillars
+    for (let i = 1; i <= 5; i++) {
+      createBlock(12 + i * 3, i * 2, 0, 3);
+    }
 
-    // موقع بداية الكاميرا
-    controls.getObject().position.set(0, 4, 0);
+    controls.getObject().position.set(0, 3, 0);
 
-    // نظام الحركة والفيزياء
-    let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
-    let canJump = false;
-    let velocity = new THREE.Vector3();
-    let direction = new THREE.Vector3();
-
-    window.addEventListener('keydown', (e) => {
-      if (e.code === 'KeyW' || e.code === 'ArrowUp') moveForward = true;
-      if (e.code === 'KeyS' || e.code === 'ArrowDown') moveBackward = true;
-      if (e.code === 'KeyA' || e.code === 'ArrowLeft') moveLeft = true;
-      if (e.code === 'KeyD' || e.code === 'ArrowRight') moveRight = true;
-      if (e.code === 'Space' && canJump) {
-        velocity.y += 10;
-        canJump = false;
-      }
-    });
-
-    window.addEventListener('keyup', (e) => {
-      if (e.code === 'KeyW' || e.code === 'ArrowUp') moveForward = false;
-      if (e.code === 'KeyS' || e.code === 'ArrowDown') moveBackward = false;
-      if (e.code === 'KeyA' || e.code === 'ArrowLeft') moveLeft = false;
-      if (e.code === 'KeyD' || e.code === 'ArrowRight') moveRight = false;
-    });
-
-    // نظام التكسير والبناء
+    // 7. Interaction: Mining, Building, Attacking
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2(0, 0);
+    let isSwinging = false;
 
     window.addEventListener('mousedown', (e) => {
       if (!controls.isLocked) return;
+
+      // Sword Swing Animation
+      if (selectedSlot === 0 && !isSwinging) {
+        isSwinging = true;
+        let angle = 0;
+        const swingInterval = setInterval(() => {
+          angle += 0.3;
+          weaponGroup.rotation.x = -Math.sin(angle) * 1.2;
+          if (angle >= Math.PI) {
+            clearInterval(swingInterval);
+            weaponGroup.rotation.x = 0;
+            isSwinging = false;
+          }
+        }, 20);
+      }
 
       raycaster.setFromCamera(mouse, camera);
       const intersects = raycaster.intersectObjects(objects);
 
       if (intersects.length > 0) {
-        const intersect = intersects[0];
+        const hit = intersects[0];
 
-        if (e.button === 0) { // تكسير
-          scene.remove(intersect.object);
-          objects.splice(objects.indexOf(intersect.object), 1);
-        } else if (e.button === 2) { // بناء
-          const pos = intersect.object.position.clone().add(intersect.face.normal);
-          createBlock(pos.x, pos.y, pos.z);
+        if (e.button === 0 && selectedSlot !== 0) { 
+          // Break block with blocks selected
+          scene.remove(hit.object);
+          objects.splice(objects.indexOf(hit.object), 1);
+        } else if (e.button === 2 && selectedSlot !== 0) { 
+          // Build block
+          const pos = hit.object.position.clone().add(hit.face.normal);
+          createBlock(pos.x, pos.y, pos.z, selectedSlot);
         }
       }
     });
 
     window.addEventListener('contextmenu', e => e.preventDefault());
 
-    // حلقة التحديث والرسم
+    // 8. Movement Physics Loop
+    let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+    let canJump = false;
+    let velocity = new THREE.Vector3();
+    let direction = new THREE.Vector3();
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyW') moveForward = true;
+      if (e.code === 'KeyS') moveBackward = true;
+      if (e.code === 'KeyA') moveLeft = true;
+      if (e.code === 'KeyD') moveRight = true;
+      if (e.code === 'Space' && canJump) { velocity.y += 12; canJump = false; }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'KeyW') moveForward = false;
+      if (e.code === 'KeyS') moveBackward = false;
+      if (e.code === 'KeyA') moveLeft = false;
+      if (e.code === 'KeyD') moveRight = false;
+    });
+
     let prevTime = performance.now();
 
     function animate() {
@@ -173,23 +249,30 @@
 
         velocity.x -= velocity.x * 10.0 * delta;
         velocity.z -= velocity.z * 10.0 * delta;
-        velocity.y -= 25.0 * delta;
+        velocity.y -= 30.0 * delta; // Gravity
 
         direction.z = Number(moveForward) - Number(moveBackward);
         direction.x = Number(moveRight) - Number(moveLeft);
         direction.normalize();
 
-        if (moveForward || moveBackward) velocity.z -= direction.z * 40.0 * delta;
-        if (moveLeft || moveRight) velocity.x -= direction.x * 40.0 * delta;
+        if (moveForward || moveBackward) velocity.z -= direction.z * 50.0 * delta;
+        if (moveLeft || moveRight) velocity.x -= direction.x * 50.0 * delta;
 
         controls.moveRight(-velocity.x * delta);
         controls.moveForward(-velocity.z * delta);
         controls.getObject().position.y += velocity.y * delta;
 
+        // Ground Floor Check
         if (controls.getObject().position.y < 2) {
           velocity.y = 0;
           controls.getObject().position.y = 2;
           canJump = true;
+        }
+
+        // Void Fall / Respawn
+        if (controls.getObject().position.y < -30) {
+          controls.getObject().position.set(0, 5, 0);
+          velocity.set(0, 0, 0);
         }
 
         prevTime = time;
